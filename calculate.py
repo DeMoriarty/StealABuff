@@ -26,10 +26,11 @@ jungler_dps = {'Lee Sin': [123.5, 91.3],
                 'Master Yi':[137, 113.0],
                 'Shyvana':[108.8, 90.1]}
 
-def sup_damage(champname, attacks, buff_color, aa_only = False):
+def damage(champ, attacks, buff_color, aa_only = False, bonus_stats = None):
     damage = 0
     monster = dict()
     base_champ = {'AD':0.0, 'BAD':0.0, 'AP':0.0, 'AS': 0.0}
+    base_spell = {'type':'true', 'base':0.0, 'ap':0.0, 'ad':0.0, 'bad':0.0, 'onhit':False}
     if buff_color == 'red':
         monster['HP'] = 2100
         monster['ARMOR'] = -15
@@ -44,19 +45,21 @@ def sup_damage(champname, attacks, buff_color, aa_only = False):
         monster['magicweight'] = 2 - 100/(100 - monster['MR'])
     
     
-    champ = {**base_champ, **supports[champname]}
+    champ = {**base_champ, **champ}
+    if bonus_stats:
+        for k, v in bonus_stats.items():
+            if k in champ.keys():
+                champ[k] += v
     spells = dict()
     for k, v in champ.items():
         if len(k) == 1 and int(k) <= 9:
+            v = {**base_spell, **v}
             spells[int(k)] = v
     onhit = 0
     for k, v in spells.items():
         if 'onhit' in v.keys():
             if v['onhit']:
-                if v.get('ap'):
-                    onhit = v['base'] + champ['AP'] * v['ap']
-                else:
-                    onhit = v['base']
+                onhit = v['base'] + champ['AP'] * v['ap'] + champ['AD'] * v['ad'] + champ['BAD'] * v['bad']
                 if v['type'] == 'magic':
                     onhit *= monster['magicweight']
                 elif v['type'] == 'physical':
@@ -66,16 +69,11 @@ def sup_damage(champname, attacks, buff_color, aa_only = False):
     damage = perattack * attacks
     if not aa_only:
         for k,v in spells.items():
-            apratio = 0
-            adratio = 0
-            badratio = 0
-            if v.get('ap'):
-                apratio = v['ap']
-            if v.get('bad'):
-                badratio = v['bad']
-            if v.get('ad'):
-                adratio = v['ad']
-            spell_damage = v['base'] + apratio*champ['AP'] + adratio*champ['AD'] + badratio*champ['BAD']
+            spell_damage = v['base'] + v['ap'] * champ['AP'] + v['ad'] * champ['AD'] + v['bad'] * champ['BAD']
+            if v['type'] == 'physical':
+                spell_damage *= monster['physicalweight']
+            elif v['type'] == 'magic':
+                spell_damage *= monster['magicweight']
             damage += spell_damage
     return damage
 
@@ -108,11 +106,11 @@ kaisa_w_travel = 2.26
 
 if color == 'red':
     kaisa_w_damage = 125 # with d. blade or d. ring
-    start_seconds = (2100 - sup_damage(sup, sup_attacks, 'red') - bot_damage(bot, bot_attacks, 'red', doransblade = True) - kaisa_w_damage) / jungler_dps[jgl][0]
-    end_seconds = (2100 - sup_damage(sup, sup_attacks, 'red') - bot_damage(bot, bot_attacks, 'red', doransblade = True)) / jungler_dps[jgl][0]
+    start_seconds = (2100 - damage(supports[sup], sup_attacks, 'red') - damage(bots[bot], bot_attacks, 'red', bonus_stats = {'BAD':13}) - kaisa_w_damage) / jungler_dps[jgl][0]
+    end_seconds = (2100 - damage(supports[sup], sup_attacks, 'red') - damage(bots[bot], bot_attacks, 'red', bonus_stats = {'BAD':13})) / jungler_dps[jgl][0]
 else:
     kaisa_w_damage = 155 # with d. blade or d. ring
-    start_seconds = (2100 - sup_damage(sup, sup_attacks, 'blue') - bot_damage(bot, bot_attacks, 'blue', doransblade = True) - kaisa_w_damage) / jungler_dps[jgl][1]
-    end_seconds = (2100 - sup_damage(sup, sup_attacks, 'blue') - bot_damage(bot, bot_attacks, 'blue', doransblade = True)) / jungler_dps[jgl][1]
+    start_seconds = (2100 - damage(supports[sup], sup_attacks, 'blue') - damage(bots[bot], bot_attacks, 'blue', bonus_stats = {'BAD':13}) - kaisa_w_damage) / jungler_dps[jgl][1]
+    end_seconds = (2100 - damage(supports[sup], sup_attacks, 'blue') - damage(bots[bot], bot_attacks, 'blue', bonus_stats={'BAD':13})) / jungler_dps[jgl][1]
 
 print(f'1:{round(30+start_seconds, 2) - kaisa_w_travel} -- 1:{round(30+end_seconds,2) - kaisa_w_travel}')
